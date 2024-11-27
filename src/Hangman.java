@@ -92,7 +92,6 @@ public class Hangman {
                 mismatchedLetter(wrongLetters, correctLetters, currentLetter, hiddenWord);
             gameIsNotOver = checkIfGameContinues(counterOfMistakes, RandomWord, hiddenWord);
         }
-        ;
     }
 
     private static char inputLetter(List<Character> wrongLetters, List<Character> correctLetters, Scanner scanner) {
