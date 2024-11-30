@@ -109,11 +109,11 @@ public class Hangman {
                 } else
                     continue;
             }
-            boolean isLetterMatched = checkMatch(currentLetter);
+            boolean isLetterMatched = isLetterMatched(currentLetter);
             if (isLetterMatched) {
-                matchedLetter(currentLetter);
+                showMatchedLetterCase(currentLetter);
             } else
-                mismatchedLetter(currentLetter);
+                showMismatchedLetterCase(currentLetter);
             isGameOver = isGameContinues();
         }
     }
@@ -242,7 +242,7 @@ public class Hangman {
         return ((int) (counterOfMistakes * difficultyMultiplier));
     }
 
-    private static boolean checkMatch(char letter) {
+    private static boolean isLetterMatched(char letter) {
         boolean match = false;
         for (char checkingLetter : RANDOM_WORD) {
             if (checkingLetter == letter) {
@@ -253,7 +253,7 @@ public class Hangman {
         return match;
     }
 
-    private static void matchedLetter(char letter) {
+    private static void showMatchedLetterCase(char letter) {
         CORRECT_LETTERS.add(letter);
         for (int letterIndex = 0; letterIndex < RANDOM_WORD.size(); letterIndex++) {
             if (letter == RANDOM_WORD.get(letterIndex)) {
@@ -264,7 +264,7 @@ public class Hangman {
         showHangCondition();
     }
 
-    private static void mismatchedLetter(char letter) {
+    private static void showMismatchedLetterCase(char letter) {
         WRONG_LETTERS.add(letter);
         counterOfMistakes++;
         System.out.println("Вы не угадали букву!");
