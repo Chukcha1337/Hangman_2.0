@@ -276,7 +276,10 @@ public class Hangman {
             System.out.println("Увы, Вы проиграли");
             System.out.println("Искомое слово: " + RANDOM_WORD);
             return false;
+        } else if (counterOfMistakes == 9) {
+            System.out.println("\n^ОН ДЕРЖИТСЯ ИЗ ПОСЛЕДНИХ СИЛ^\n ЭТО ЖЕ САМЫЙ ПРОСТОЙ УРОВЕНЬ! СОБЕРИТЕСЬ, У ВАС ОСТАЛАСЬ 1 ОШИБКА\n");
         }
+
         for (char checkingLetter : HIDDEN_WORD) {
             if (checkingLetter == HIDDEN_LETTER)
                 return true;
