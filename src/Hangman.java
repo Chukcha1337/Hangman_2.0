@@ -15,10 +15,8 @@ public class Hangman {
     private static final char BRAKE_GAME = '!';
     private static final int MIN_WORD_LENGTH = 5;
     private static final int MAX_WORD_LENGTH = 13;
-    private static final int ABSOLUTE_MAX_MISTAKES = 10;
-    private static int selectedDifficultyMaxMistakes = 0;
     private static int counterOfMistakes = 0;
-    private static double difficultyMultiplier = 0;
+    private static Level currentLevel;
 
     public static void main(String[] args) {
         getDictionary();
@@ -34,14 +32,13 @@ public class Hangman {
         List<String> dictionaryList = new ArrayList<>();
         try (Scanner scanner = new Scanner(DICTIONARY)) {
             while (scanner.hasNextLine()) {
-               String line = scanner.nextLine();
+                String line = scanner.nextLine();
                 if (isWordAllowed(line))
                     dictionaryList.add(line);
             }
         } catch (FileNotFoundException e) {
             System.out.println("Файл словаря не найден");
         }
-        System.out.println(dictionaryList.size());
         return dictionaryList;
     }
 
@@ -60,8 +57,8 @@ public class Hangman {
     }
 
     private static boolean wannaStartNewGame(Scanner scanner) {
-        do {
-            System.out.println("    Хотите начать новую игру? \n (" + AGREEMENT + ") - Новая игра   (" + DISAGREEMENT + ") - Выход");
+        while (true) {
+            System.out.printf("    Хотите начать новую игру? \n ('%s') - Новая игра   ('%s') - Выход \n", AGREEMENT, DISAGREEMENT);
             String decision = scanner.nextLine().toLowerCase();
             if (decision.equals(AGREEMENT)) {
                 refreshGame();
@@ -70,13 +67,12 @@ public class Hangman {
                 System.out.println("Благодарю Вас за игру!");
                 return false;
             } else
-                System.out.println("Уважаемый пользователь, пожалуйста, введите только (" + AGREEMENT + ") либо (" + DISAGREEMENT + ")");
-        } while (true);
+                System.out.printf("Уважаемый пользователь, пожалуйста, введите только ('%s') либо ('%s') \n", AGREEMENT, DISAGREEMENT);
+        }
     }
 
     private static void refreshGame() {
         counterOfMistakes = 0;
-        difficultyMultiplier = 0;
         WRONG_LETTERS.clear();
         CORRECT_LETTERS.clear();
         HIDDEN_WORD.clear();
@@ -94,92 +90,118 @@ public class Hangman {
     }
 
     private static void startCurrentGameLoop(Scanner scanner) {
-        boolean isGameOver = true;
-        for (int _ : RANDOM_WORD)
+        for (int charIndex = 0; charIndex < RANDOM_WORD.size(); charIndex++) {
             HIDDEN_WORD.add(HIDDEN_LETTER);
+        }
         setCurrentDifficulty(scanner);
-        while (isGameOver) {
+        System.out.println("Приветствую в игре Виселица! \n" +
+                "Начальное состояние:");
+        showStartGameCondition();
+        while (true) {
             char currentLetter = inputLetter(scanner);
-            if (currentLetter == BRAKE_GAME) {
+            if (isExitCommand(currentLetter)) {
                 boolean decision = breakingGame(scanner);
                 if (decision) {
                     System.out.println("Очень жаль! Искомое слово: " + RANDOM_WORD);
                     showHangCondition();
                     break;
-                } else
-                    continue;
+                }
+                continue;
             }
             boolean isLetterMatched = isLetterMatched(currentLetter);
             if (isLetterMatched) {
-                showMatchedLetterCase(currentLetter);
-            } else
-                showMismatchedLetterCase(currentLetter);
-            isGameOver = isGameContinues();
+                CORRECT_LETTERS.add(currentLetter);
+                revealMatchedLetter(currentLetter);
+                showMatchedLetterCase();
+            } else {
+                WRONG_LETTERS.add(currentLetter);
+                counterOfMistakes++;
+                showMismatchedLetterCase();
+            }
+            if (isItLose()) {
+                showLoseMessage();
+                break;
+            } else if (isItWin()) {
+                showWinMessage();
+                break;
+            }
+        }
+    }
+
+    private static void showWinMessage() {
+        System.out.println("Поздравляю, Вы Выиграли!");
+        System.out.println("Искомое слово: " + RANDOM_WORD);
+    }
+
+    private static void showLoseMessage() {
+        System.out.println("Увы, Вы проиграли");
+        System.out.println("Искомое слово: " + RANDOM_WORD);
+    }
+
+    private static void revealMatchedLetter(char letter) {
+        for (int letterIndex = 0; letterIndex < RANDOM_WORD.size(); letterIndex++) {
+            if (letter == RANDOM_WORD.get(letterIndex)) {
+                HIDDEN_WORD.set(letterIndex, letter);
+            }
         }
     }
 
     private static void setCurrentDifficulty(Scanner scanner) {
-        setDifficultyMultiplier(selectDifficulty(scanner));
-        getCurrentDifficultyMaxMistakes();
-        easyDifficultyCase();
-    }
-
-    private static void setDifficultyMultiplier(int difficulty) {
-        switch (difficulty) {
-            case (1) -> difficultyMultiplier = 1;
-            case (2) -> difficultyMultiplier = 1.5;
-            case (3) -> difficultyMultiplier = 2;
-            case (4) -> difficultyMultiplier = 3;
+        selectDifficulty(scanner);
+        if (currentLevel.getAmountOpenLetters() != 0) {
+            openSomeLetters();
         }
     }
 
-    private static int selectDifficulty(Scanner scanner) {
-        int difficulty;
+    private static void selectDifficulty(Scanner scanner) {
         while (true) {
-            System.out.println("""
-                    Выберите уровень сложности:
-                    (1) - очень легкий (10 ошибок, одна буква открыта)
-                    (2) - легкий (6 ошибок, одна буква открыта)
-                    (3) - средний (5 ошибок, все буквы скрыты)
-                    (4) - чудовище (3 ошибки, все буквы скрыты)""");
+            System.out.println("Выберите уровень сложности:");
+            showLevel(Level.VERY_EASY, "очень легко");
+            showLevel(Level.EASY, "легко");
+            showLevel(Level.MEDIUM, "средний");
+            showLevel(Level.HARD, "зверь");
+            int numLevel;
             try {
-                difficulty = Integer.parseInt(scanner.nextLine());
+                numLevel = Integer.parseInt(scanner.nextLine());
             } catch (NumberFormatException e) {
-                System.out.println("Уважаемый пользователь, пожалуйста, введите только 1, 2, 3 или 4");
+                System.out.println("Вы ввели не число");
                 continue;
             }
-
-            if (difficulty >= 1 && difficulty <= 4)
-                return difficulty;
-            else
-                System.out.println("Уважаемый пользователь, пожалуйста, введите только 1, 2, 3 или 4");
+            if (numLevel < Level.VERY_EASY.ordinal() || numLevel > Level.HARD.ordinal()) {
+                System.out.println("Уважаемый пользователь, пожалуйста, введите только 0, 1, 2 или 3");
+                continue;
+            }
+            currentLevel = Level.values()[numLevel];
+            break;
         }
     }
 
-    private static void getCurrentDifficultyMaxMistakes() {
-        selectedDifficultyMaxMistakes = ((int) (ABSOLUTE_MAX_MISTAKES / difficultyMultiplier));
+    private static void showLevel(Level level, String title) {
+        System.out.printf("(%d) - %s (ошибок: %d, открытых букв: %d) \n",
+                level.ordinal(),
+                title,
+                level.getMaxMistakes(),
+                level.getAmountOpenLetters()
+        );
     }
 
-    private static void easyDifficultyCase() {
+    private static void openSomeLetters() {
 
-        if (difficultyMultiplier < 2) {
-            HIDDEN_WORD.set(0, RANDOM_WORD.getFirst());
+        for (int letterNumber = 0; letterNumber < currentLevel.getAmountOpenLetters(); letterNumber++) {
+            HIDDEN_WORD.set(letterNumber, RANDOM_WORD.get(letterNumber));
             for (int i = 0; i < RANDOM_WORD.size(); i++) {
-                if (RANDOM_WORD.get(i).equals(HIDDEN_WORD.getFirst())) {
-                    HIDDEN_WORD.set(i, RANDOM_WORD.get(i));
+                if (RANDOM_WORD.get(i).equals(HIDDEN_WORD.get(letterNumber))) {
+                    HIDDEN_WORD.set(i, RANDOM_WORD.get(letterNumber));
                 }
             }
-            CORRECT_LETTERS.add(HIDDEN_WORD.getFirst());
+            CORRECT_LETTERS.add(HIDDEN_WORD.get(letterNumber));
         }
-        System.out.println("Приветсвую в игре Виселица! \n" +
-                "Начальное состояние:");
-        showHangCondition();
     }
 
     private static char inputLetter(Scanner scanner) {
         char letter;
         while (true) {
-            System.out.println("Введите букву русского алфавита (либо введите (" + BRAKE_GAME + ") чтобы выйти из текущей игры): ");
+            System.out.printf("Введите букву русского алфавита (либо введите ('%s') чтобы выйти из текущей игры): ", BRAKE_GAME);
             String input = scanner.nextLine().toLowerCase();
             if (input.length() == 1) {
                 letter = input.charAt(0);
@@ -189,19 +211,27 @@ public class Hangman {
             } else if (isLetterAllowed(letter)) {
                 break;
             } else
-                System.out.println("Вы ввели не букву, попробуйте еще раз");
+                System.out.println("Вы ввели не букву русского алфавита, попробуйте еще раз");
         }
         return letter;
     }
 
     private static boolean isLetterAllowed(char letter) {
-        return ((letter >= 'а' && letter <= 'я') || letter == 'ё' || letter == BRAKE_GAME);
+        return isRussianLetter(letter) || isExitCommand(letter);
+    }
+
+    private static boolean isRussianLetter(char letter) {
+        return ((letter >= 'а' && letter <= 'я') || letter == 'ё');
+    }
+
+    private static boolean isExitCommand(char letter) {
+        return letter == BRAKE_GAME;
     }
 
     private static boolean breakingGame(Scanner scanner) {
-        do {
-            System.out.println("Вы уверены, что хотите завершить текущую игру и выйти в главное меню? \n " +
-                    "      (" + AGREEMENT + ") - Выйти в меню   (" + DISAGREEMENT + ") - Продолжить игру");
+        while (true) {
+            System.out.printf("Вы уверены, что хотите завершить текущую игру и выйти в главное меню? \n " +
+                    "      ('%s') - Выйти в меню   ('%s') - Продолжить игру", AGREEMENT, DISAGREEMENT);
             String decision = scanner.nextLine().toLowerCase();
             if (decision.equals(AGREEMENT)) {
                 return true;
@@ -209,83 +239,57 @@ public class Hangman {
                 System.out.println("А Вы - крепкий орешек...");
                 return false;
             } else
-                System.out.println("Уважаемый пользователь, пожалуйста, введите только (" + AGREEMENT + ") либо (" + DISAGREEMENT + ")");
-        } while (true);
+                System.out.printf("Уважаемый пользователь, пожалуйста, введите только ('%s') либо ('%s') \n", AGREEMENT, DISAGREEMENT);
+        }
+    }
+
+    private static void showProgress() {
+        System.out.println("Угаданные буквы: " + CORRECT_LETTERS);
+        System.out.println("Неправильные буквы: " + WRONG_LETTERS);
+        System.out.println("Количество ошибок: " + counterOfMistakes + " / " + currentLevel.getMaxMistakes());
+        System.out.println("Загаданное слово: " + HIDDEN_WORD);
+    }
+
+    private static void showStartGameCondition() {
+        showProgress();
+        HangmanRenderer.print(Level.HARD, 3);
     }
 
     private static void showHangCondition() {
-        System.out.println("Угаданные буквы: " + CORRECT_LETTERS);
-        System.out.println("Неправильные буквы: " + WRONG_LETTERS);
-        System.out.println("Количество ошибок: " + counterOfMistakes + " / " + selectedDifficultyMaxMistakes);
-        System.out.println("Загаданное слово: " + HIDDEN_WORD);
-        System.out.println(getHang());
-    }
-
-    private static String getHang() {
-        String hangRepresentation = "";
-        switch (numberOfCurrentHang()) {
-            case (0) -> hangRepresentation = Mistakes.ZERO_MISTAKES.getHangRepresentation();
-            case (1) -> hangRepresentation = Mistakes.ONE_MISTAKE.getHangRepresentation();
-            case (2) -> hangRepresentation = Mistakes.TWO_MISTAKES.getHangRepresentation();
-            case (3) -> hangRepresentation = Mistakes.THREE_MISTAKES.getHangRepresentation();
-            case (4) -> hangRepresentation = Mistakes.FOUR_MISTAKES.getHangRepresentation();
-            case (5) -> hangRepresentation = Mistakes.FIVE_MISTAKES.getHangRepresentation();
-            case (6) -> hangRepresentation = Mistakes.SIX_MISTAKES.getHangRepresentation();
-            case (7) -> hangRepresentation = Mistakes.SEVEN_MISTAKES.getHangRepresentation();
-            case (8) -> hangRepresentation = Mistakes.EIGHT_MISTAKES.getHangRepresentation();
-            case (9), (10) -> hangRepresentation = Mistakes.GAME_OVER.getHangRepresentation();
-        }
-        return hangRepresentation;
-    }
-
-    private static int numberOfCurrentHang(){
-        return ((int) (counterOfMistakes * difficultyMultiplier));
+        showProgress();
+        HangmanRenderer.print(currentLevel, counterOfMistakes);
     }
 
     private static boolean isLetterMatched(char letter) {
-        boolean match = false;
         for (char checkingLetter : RANDOM_WORD) {
             if (checkingLetter == letter) {
-                match = true;
-                break;
+                return true;
             }
         }
-        return match;
+        return false;
     }
 
-    private static void showMatchedLetterCase(char letter) {
-        CORRECT_LETTERS.add(letter);
-        for (int letterIndex = 0; letterIndex < RANDOM_WORD.size(); letterIndex++) {
-            if (letter == RANDOM_WORD.get(letterIndex)) {
-                HIDDEN_WORD.set(letterIndex, letter);
-            }
-        }
+    private static void showMatchedLetterCase() {
         System.out.println("Вы угадали букву!");
         showHangCondition();
     }
 
-    private static void showMismatchedLetterCase(char letter) {
-        WRONG_LETTERS.add(letter);
-        counterOfMistakes++;
+    private static void showMismatchedLetterCase() {
+
         System.out.println("Вы не угадали букву!");
         showHangCondition();
     }
 
-    private static boolean isGameContinues() {
-        if (counterOfMistakes == ((int) (ABSOLUTE_MAX_MISTAKES / difficultyMultiplier))) {
-            System.out.println("Увы, Вы проиграли");
-            System.out.println("Искомое слово: " + RANDOM_WORD);
-            return false;
-        } else if (counterOfMistakes == 9) {
-            System.out.println("\n^ОН ДЕРЖИТСЯ ИЗ ПОСЛЕДНИХ СИЛ^\n ЭТО ЖЕ САМЫЙ ПРОСТОЙ УРОВЕНЬ! СОБЕРИТЕСЬ, У ВАС ОСТАЛАСЬ 1 ОШИБКА\n");
-        }
-
+    private static boolean isItWin() {
         for (char checkingLetter : HIDDEN_WORD) {
-            if (checkingLetter == HIDDEN_LETTER)
-                return true;
+            if (checkingLetter == HIDDEN_LETTER) {
+                return false;
+            }
         }
-        System.out.println("Поздравляю, Вы Выиграли!");
-        System.out.println("Искомое слово: " + RANDOM_WORD);
-        return false;
+        return true;
+    }
+
+    private static boolean isItLose() {
+        return (counterOfMistakes == currentLevel.getMaxMistakes());
     }
 }
